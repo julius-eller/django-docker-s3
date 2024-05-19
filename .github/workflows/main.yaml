@@ -24,7 +24,7 @@ jobs:
           pip install --upgrade pip
 
       - name: Install python dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r ./app/requirements.txt
 
       - name: Cache pip dependencies
         uses: actions/cache@v2
