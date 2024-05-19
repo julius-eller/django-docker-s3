@@ -1,19 +1,53 @@
 on: [push]
 
+name: 'Collect static files'
 jobs:
-  hello_world_job:
+  build:
     runs-on: ubuntu-latest
-    name: A job to say hello
+
+    env:
+      AWS_REGION: ap-southeast-2
+    
     steps:
-      # To use this repository's private action,
-      # you must check out the repository
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Hello world action step
-        uses: ./actions
-        id: hello
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python environment
+        uses: actions/setup-python@v3
         with:
-          who-to-greet: 'Mona the Octocat'
-      # Use the output from the `hello` step
-      - name: Get the output time
-        run: echo "The time was ${{ steps.hello.outputs.time }}"
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          apk update \
+          && apk add --virtual build-deps gcc python3-dev musl-dev \
+          && apk add bash postgresql-dev \
+          && pip install --upgrade pip \
+          && pip install psycopg2
+
+      - name: Install python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v2
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_S3_UAT_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_S3_UAT_ACCESS_SECRET }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Collect static files
+        env:
+          ALLOWED_HOSTS: '["*"]'
+          CSRF_TRUSTED_ORIGINS: '["*"]'
+          CORS_ALLOWED_ORIGINS: '["*"]'
+          USE_S3: true
+          AWS_STORAGE_BUCKET_NAME: "django-static-1232"
+        run: python manage.py collectstatic --noinput
